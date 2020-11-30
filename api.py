@@ -1,5 +1,7 @@
 import flask
 from flask import request, jsonify
+import sqlite3
+
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 
@@ -74,7 +76,7 @@ def home():
     return "<h1>An API</h1><p>This site is for an API for... something</p>"
 
 @app.route('/api/v1/ffxiv/jobs/all', methods=['GET'])
-def api_all():
+def ffxiv_api_all():
     return jsonify(jobs)
 
 #api/v1/ffxiv/jobs?id=xxxx
@@ -92,5 +94,15 @@ def ffxiv_api_job():
             results.append(job)
 
     return jsonify(results)
+
+@app.route('/api/v1/ffxiv/spells/all', methods=['GET'])
+def ffxiv_api_spells_all():
+    results = []
+
+    for job in jobs:
+        for i in job["PvE"]:
+            results.append(i)
+
+    return jsonify(jobs)
 
 app.run()
