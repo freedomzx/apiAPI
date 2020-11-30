@@ -5,104 +5,102 @@ import sqlite3
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
 
-"""
-"name": "",
-"level": ,
-"type": "",
-"mp": ,
-"cast_time": ,
-"recast_time": ,
-"description": ""
-"""
+def dict_factory(cursor, row):
+    dicti = {}
+    for idx, col in enumerate(cursor.description):
+        dicti[col[0]] = row[idx]
+    return dicti
 
-jobs = [
-    #Black Mage
-    {
-        "job": "black-mage",
-        "abbreviation": "blm",
-        "full": "Black Mage",
-        "PvE": {
-            0: {
-                "name": "Blizzard",
-                "level": 1,
-                "type": "spell",
-                "mp": 400,
-                "cast_time": 2.5,
-                "recast_time": 2.5,
-                "description": "Deals ice damage with a potency of 180.\nAdditional Effect: Grants Umbral Ice or removes Astral Fire\nDuration: 15s"
-            },
-            1: {
-                "name": "Fire",
-                "level": 2,
-                "type": "Spell",
-                "mp": 800,
-                "cast_time": 2.5,
-                "recast_time": 2.5,
-                "description": "Deals fire damage with a potency of 180.\nAdditional Effect: Grants Astral Fire or removes Umbral Ice\nDuration: 15s\nAdditional Effect: 40% chance next Fire III will cost no MP and have no cast time\nDuration:18s"
-            },
-            2: {
-                "name": "Transpose",
-                "level": 4,
-                "Type": "Ability",
-                "mo": 0,
-                "cast_time": 0,
-                "recast_time": 5,
-                "description": "Swaps Astral Fire with a single Umbral Ice, or Umbral Ice with a single Astral Fire."
-            },
-            3: {
-                "name": "Thunder",
-                "level": 6,
-                "Type": "Spell",
-                "mo": 200,
-                "cast_time": 2.5,
-                "recast_time": 2.5,
-                "description": "Deals lightning damage with a potency of 30.\nAdditional Effect: Lightning damage over time\nPotency: 40\nDuration: 18s\nAdditional Effect: 10% chance after each tick that the next Thunder spell of any grade will add its full damage over time amount to its initial damage, have no cast time, and cost no MP\nDuration: 18s\nOnly one Thunder spell-induced damage over time effect per caster can be inflicted upon a single target."
-            },
-            4: {
-                "name": "Sleep",
-                "level": 10,
-                "Type": "Spell",
-                "mo": 800,
-                "cast_time": 2.5,
-                "recast_time": 2.5,
-                "description": "Puts target and all nearby enemies to sleep."
-            }
-        }
-    }
-]
 #http://127.0.0.1:5000/
 @app.route('/', methods=["GET"])
 def home():
     return "<h1>An API</h1><p>This site is for an API for... something</p>"
 
+#404 resource not found
+@app.errorhandler(404)
+def page_not_found(e):
+    return "<h1>404</h1><p>The requested resource could not be found.</p>"
+
+#/api/v1/ffxiv/jobs/all - all ffxiv jobs
 @app.route('/api/v1/ffxiv/jobs/all', methods=['GET'])
-def ffxiv_api_all():
-    return jsonify(jobs)
+def ffxiv_jobs_all():
+    #connect to sqlite and set cursor
+    connection = sqlite3.connect('api.db')
+    connection.row_factory = dict_factory
+    cursor = connection.cursor()
 
-#api/v1/ffxiv/jobs?id=xxxx
-@app.route('/api/v1/ffxiv/jobs', methods=['GET'])
-def ffxiv_api_job():
-    if 'id' in request.args:
-        id = request.args['id']
+    #execute query for all jobs
+    query = "select * from ffxiv_jobs"
+    all_jobs = cursor.execute(query).fetchall()
+
+    return jsonify(all_jobs)
+
+#/api/v1/ffxiv/spells/all - all ffxiv spells
+@app.route('/api/v1/ffxiv/actions/all', methods=['GET'])
+def ffxiv_spells_all():
+    #connect to sqlite and set cursor
+    connection = sqlite3.connect('api.db')
+    connection.row_factory = dict_factory
+    cursor = connection.cursor()
+
+    #execute query for all spells
+    query = "select * from ffxiv_actions"
+    all_spells = cursor.execute(query).fetchall()
+
+    return jsonify(all_spells)
+
+#/api/v1/ffxiv/jobs/spells?job=??? - all spells for a certain job - use 3 letter abbreviation
+@app.route('/api/v1/ffxiv/jobs/actions', methods=['GET'])
+def ffxiv_job_spells():
+    #get args
+    params = request.args
+    job = params.get('job')
+
+    #prep query
+    query = "select * from ffxiv_actions where"
+    to_filter = []
+    if job:
+        query += ' job=?'
+        to_filter.append(job)
     else:
-        return "Error: No id field provided"
+        return page_not_found(404)
+    query += ";"
 
-    results = []
+    #connect to sqlite and set cursor
+    connection = sqlite3.connect('api.db')
+    connection.row_factory = dict_factory
+    cursor = connection.cursor()
 
-    for job in jobs:
-        if job["job"] == id or job["abbreviation"] == id or job["full"] == id:
-            results.append(job)
+    #execute query for all spells listed under a job
+    results = cursor.execute(query, to_filter).fetchall()
 
     return jsonify(results)
 
-@app.route('/api/v1/ffxiv/spells/all', methods=['GET'])
-def ffxiv_api_spells_all():
-    results = []
+#/api/v1/ffxiv/actions
+@app.route('/api/v1/ffxiv/actions', methods=['GET'])
+def ffxiv_spell():
+    #get args
+    params = request.args
+    action = params.get('action_name')
 
-    for job in jobs:
-        for i in job["PvE"]:
-            results.append(i)
+    #prep query
+    query = "select * from ffxiv_actions where"
+    to_filter = []
+    if action:
+        query += ' action_name=?'
+        to_filter.append(action)
+    else:
+        return page_not_found(404)
+    query += ";"
 
-    return jsonify(jobs)
+    #connect to sqlite and set cursor
+    connection = sqlite3.connect('api.db')
+    connection.row_factory = dict_factory
+    cursor = connection.cursor()
+
+    #execute query for all spells listed under a job
+    results = cursor.execute(query, to_filter).fetchall()
+
+    return jsonify(results)
 
 app.run()
